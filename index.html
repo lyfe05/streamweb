@@ -3,10 +3,202 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="styles.css">
-    <title>Live TV Player</title>
+    <title>IPTV Player</title>
+    <style>
+        @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;700&display=swap");
+
+        :root {
+            --primary-color: #00a8ff;
+            --secondary-color: #ff6b6b;
+            --background-color: #0f0f1e;
+            --text-color: #e0e0e0;
+            --card-background: rgba(30, 30, 50, 0.7);
+            --scrollbar-thumb: #4a4a6a;
+            --scrollbar-track: #2a2a3a;
+        }
+
+        body {
+            font-family: "Montserrat", sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            transition: background-color 0.3s ease;
+            overflow: hidden;
+        }
+
+        .background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            margin-right: 10px;
+            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-icon::before {
+            content: "▶";
+            color: white;
+            font-size: 20px;
+        }
+
+        h1 {
+            margin: 0;
+            font-weight: 700;
+            letter-spacing: 1px;
+            font-size: 16px;
+        }
+
+        .container {
+            display: flex;
+            max-width: 1400px;
+            margin: 1em auto;
+            padding: 0 2em;
+            gap: 1em;
+        }
+
+        .channel-list {
+            width: 220px;
+            height: calc(100vh - 50px);
+            background-color: var(--card-background);
+            border-radius: 2px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            overflow-y: auto;
+            transition: box-shadow 0.3s ease;
+            scrollbar-width: thin;
+            scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+        }
+
+        .channel-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .channel-list::-webkit-scrollbar-track {
+            background: var(--scrollbar-track);
+        }
+
+        .channel-list::-webkit-scrollbar-thumb {
+            background-color: var(--scrollbar-thumb);
+            border-radius: 2px;
+        }
+
+        .channel-list:hover {
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .channel-item {
+            padding: 0.5em;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .channel-item:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            transform: translateX(5px);
+        }
+
+        .channel-item.active {
+            background-color: rgba(0, 168, 255, 0.2);
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .channel-name {
+            font-weight: bold;
+            margin-bottom: 0.25em;
+        }
+
+        .channel-category {
+            color: #aaa;
+            font-size: 0.6em;
+        }
+
+        .player-container {
+            flex-grow: 1;
+            position: relative;
+        }
+
+        #videoPlayer {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background-color: #000;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            transition: box-shadow 0.3s ease;
+            position: relative;
+            z-index: 2;
+        }
+
+        #videoPlayer:hover {
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .video-glow {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 150%;
+            height: 150%;
+            border-radius: 50%;
+            pointer-events: none;
+            opacity: 0.6;
+            transition: all 0.5s ease;
+            filter: blur(50px);
+            z-index: 1;
+        }
+
+        #loading {
+            text-align: center;
+            font-size: 1.2em;
+            margin-top: 2em;
+            color: var(--primary-color);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            .channel-list {
+                width: 100%;
+                height: auto;
+                max-height: 300px;
+            }
+        }
+
+        /* Animation for channel items */
+        .fade-in {
+            opacity: 0;
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+    </style>
 </head>
 <body>
+    <div class="background"></div>
     <div class="container">
         <div class="channel-list" id="channelList">Channels:
             <div id="loading">Loading available channels...</div>
@@ -16,7 +208,274 @@
             <video id="videoPlayer" controls></video>
         </div>
     </div>
+
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script src="script.js"></script>
+    <script>
+        // Special thanks to https://github.com/iptv-org/iptv/tree/master/streams for the channel files (m3u8)
+        const channels = [
+            {
+                name: "KRON SF",
+                category: "News, Local",
+                url: "https://difwk89tryvik.cloudfront.net/v1/master/dfe581e0a446a1e548014078b2d81b62b917979d/KRON_AD_CAMPAIGN/index.m3u8"
+            },
+            {
+                name: "KGO SF",
+                category: "News, Local",
+                url: "https://content.uplynk.com/channel/ext/4413701bf5a1488db55b767f8ae9d4fa/kgo_24x7_news.m3u8"
+            },
+            {
+                name: "KABC LA",
+                category: "News, Local",
+                url: "https://content.uplynk.com/channel/ext/2118d9222a87420ab69223af9cfa0a0f/kabc_24x7_news.m3u8"
+            },
+            {
+                name: "CBS LA",
+                category: "News, Local",
+                url: "https://cbsn-la.cbsnstream.cbsnews.com/out/v1/57b6c4534a164accb6b1872b501e0028/master.m3u8"
+            },
+            {
+                name: "ABC News",
+                category: "News",
+                url: "https://content.uplynk.com/channel/3324f2467c414329b3b0cc5cd987b6be.m3u8"
+            },
+            {
+                name: "CBS News",
+                category: "News",
+                url: "https://cbsn-us.cbsnstream.cbsnews.com/out/v1/55a8648e8f134e82a470f83d562deeca/master.m3u8"
+            },
+            {
+                name: "Sky News",
+                category: "News",
+                url: "https://skynewsau-live.akamaized.net/hls/live/2002689/skynewsau-extra1/master.m3u8"
+            },
+            {
+                name: "Newsmax",
+                category: "News",
+                url: "https://nmxlive.akamaized.net/hls/live/529965/Live_1/index.m3u8"
+            },
+            {
+                name: "DW English",
+                category: "News",
+                url: "https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8"
+            },
+            {
+                name: "Red Bull TV",
+                category: "Sports",
+                url: "https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8"
+            },
+            {
+                name: "Tastemade",
+                category: "Lifestyle",
+                url: "https://tastemadessai.akamaized.net/amagi_hls_data_tastemade-tastemade/CDN/playlist.m3u8"
+            },
+            {
+                name: "Fashion TV",
+                category: "Lifestyle",
+                url: "https://fash1043.cloudycdn.services/slive/_definst_/ftv_ftv_midnite_k1y_27049_midnite_secr_108_hls.smil/playlist.m3u8"
+            },
+            {
+                name: "Bon Appétit",
+                category: "Lifestyle",
+                url: "https://bonappetit-samsung.amagi.tv/playlist.m3u8"
+            },
+            {
+                name: "World Poker Tour",
+                category: "World Poker Tour",
+                url: "https://d3w4n3hhseniak.cloudfront.net/v1/master/9d062541f2ff39b5c0f48b743c6411d25f62fc25/WPT-DistroTV/150.m3u8"
+            },
+            {
+                name: "Rakuten TV Action",
+                category: "Movies",
+                url: "https://rakuten-actionmovies-1-eu.rakuten.wurl.tv/playlist.m3u8"
+            },
+            {
+                name: "AsianCrush",
+                category: "Movies",
+                url: "https://amg01201-cinedigmenterta-asiancrush-cineverse-x701o.amagi.tv/playlist/amg01201-cinedigmenterta-asiancrush-cineverse/playlist.m3u8"
+            },
+            {
+                name: "Ultimate Music Ch",
+                category: "Music",
+                url: "https://app.viloud.tv/hls/channel/0694b92d093cc2bd5438ff9bbccaf1a2.m3u8"
+            },
+            {
+                name: "30A Music",
+                category: "Musics",
+                url: "https://30a-tv.com/feeds/ceftech/30atvmusic.m3u8"
+            },
+            {
+                name: "Adult Swim Toonami",
+                category: "Comics",
+                url: "https://adultswim-vodlive.cdn.turner.com/live/toonami/stream.m3u8"
+            },
+            {
+                name: "AS Rick and Morty",
+                category: "Comics",
+                url: "https://adultswim-vodlive.cdn.turner.com/live/rick-and-morty/stream.m3u8"
+            },
+            {
+                name: "AS Robot Chicken",
+                category: "Comics",
+                url: "https://adultswim-vodlive.cdn.turner.com/live/robot-chicken/stream.m3u8"
+            },
+            {
+                name: "AS Mr. Pickles",
+                category: "Comics",
+                url: "https://adultswim-vodlive.cdn.turner.com/live/mr-pickles/stream.m3u8"
+            },
+            {
+                name: "30A Ridiculous TV",
+                category: "Tiktok",
+                url: "https://30a-tv.com/feeds/720p/63.m3u8"
+            },
+            {
+                name: "Arirang TV",
+                category: "News, KR",
+                url: "https://amdlive-ch01-ctnd-com.akamaized.net/arirang_1ch/smil:arirang_1ch.smil/playlist.m3u8"
+            }
+        ];
+
+        const channelList = document.getElementById("channelList");
+        const videoPlayer = document.getElementById("videoPlayer");
+        const loading = document.getElementById("loading");
+        const videoGlow = document.querySelector(".video-glow");
+        let currentChannelIndex = -1;
+        let lastGlowColor = { r: 0, g: 0, b: 0 };
+        let glowUpdateInterval;
+
+        function loadChannels() {
+            loading.style.display = "none";
+            channels.forEach((channel, index) => {
+                const channelItem = document.createElement("div");
+                channelItem.className = "channel-item fade-in";
+                channelItem.style.animationDelay = `${index * 0.05}s`;
+                channelItem.innerHTML = `
+                    <div class="channel-name">${channel.name}</div>
+                    <div class="channel-category">${channel.category}</div>
+                `;
+                channelItem.addEventListener("click", () => {
+                    selectChannel(index);
+                });
+                channelList.appendChild(channelItem);
+            });
+        }
+
+        function selectChannel(index) {
+            currentChannelIndex = index;
+            const selectedChannel = channels[index];
+            if (Hls.isSupported()) {
+                const hls = new Hls();
+                hls.loadSource(selectedChannel.url);
+                hls.attachMedia(videoPlayer);
+                hls.on(Hls.Events.MANIFEST_PARSED, function () {
+                    videoPlayer.play().catch(error => {
+                        console.error("Playback error:", error);
+                    });
+                });
+                hls.on(Hls.Events.ERROR, function (event, data) {
+                    console.error("HLS error:", data);
+                    alert("Error loading channel: " + selectedChannel.name);
+                });
+            } else if (videoPlayer.canPlayType("application/vnd.apple.mpegurl")) {
+                videoPlayer.src = selectedChannel.url;
+                videoPlayer.addEventListener("loadedmetadata", function () {
+                    videoPlayer.play().catch(error => {
+                        console.error("Playback error:", error);
+                    });
+                });
+            } else {
+                alert("Your browser does not support HLS streaming.");
+            }
+
+            // Update active state in the list
+            const channelItems = channelList.getElementsByClassName("channel-item");
+            for (let i = 0; i < channelItems.length; i++) {
+                channelItems[i].classList.remove("active");
+            }
+            channelItems[index].classList.add("active");
+
+            // Scroll to the active channel
+            channelItems[index].scrollIntoView({
+                behavior: "smooth",
+                block: "nearest"
+            });
+
+            // Animate the channel change
+            videoPlayer.classList.add("fade-in");
+            setTimeout(() => videoPlayer.classList.remove("fade-in"), 500);
+
+            // Reset glow color and start updating
+            lastGlowColor = { r: 0, g: 0, b: 0 };
+            clearInterval(glowUpdateInterval);
+            glowUpdateInterval = setInterval(updateVideoGlow, 100);
+        }
+
+        function updateVideoGlow() {
+            if (!videoPlayer.videoWidth || !videoPlayer.videoHeight) return;
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            canvas.width = videoPlayer.videoWidth;
+            canvas.height = videoPlayer.videoHeight;
+            ctx.drawImage(videoPlayer, 0, 0, canvas.width, canvas.height);
+            // Sample multiple points for more accurate color representation
+            const samplePoints = [
+                { x: 0, y: 0 },
+                { x: canvas.width - 1, y: 0 },
+                { x: 0, y: canvas.height - 1 },
+                { x: canvas.width - 1, y: canvas.height - 1 },
+                { x: Math.floor(canvas.width / 2), y: Math.floor(canvas.height / 2) }
+            ];
+            let r = 0, g = 0, b = 0;
+            samplePoints.forEach((point) => {
+                const pixel = ctx.getImageData(point.x, point.y, 1, 1).data;
+                r += pixel[0];
+                g += pixel[1];
+                b += pixel[2];
+            });
+            r = Math.floor(r / samplePoints.length);
+            g = Math.floor(g / samplePoints.length);
+            b = Math.floor(b / samplePoints.length);
+            // Smooth color transition
+            const transitionSpeed = 0.1;
+            lastGlowColor.r += (r - lastGlowColor.r) * transitionSpeed;
+            lastGlowColor.g += (g - lastGlowColor.g) * transitionSpeed;
+            lastGlowColor.b += (b - lastGlowColor.b) * transitionSpeed;
+            // Set glow color and intensity
+            const glowColor = `rgb(${Math.round(lastGlowColor.r)},${Math.round(lastGlowColor.g)},${Math.round(lastGlowColor.b)})`;
+            videoGlow.style.background = `radial-gradient(circle, ${glowColor} 0%, rgba(${Math.round(lastGlowColor.r)},${Math.round(lastGlowColor.g)},${Math.round(lastGlowColor.b)},0.2) 70%, rgba(${Math.round(lastGlowColor.r)},${Math.round(lastGlowColor.g)},${Math.round(lastGlowColor.b)},0) 100%)`;
+        }
+
+        // Load channels on page load
+        loadChannels();
+
+        // Enable smooth scrolling for the channel list
+        channelList.addEventListener("wheel", (e) => {
+            e.preventDefault();
+            channelList.scrollBy({
+                top: e.deltaY,
+                behavior: "smooth"
+            });
+        });
+
+        // Enable keyboard navigation
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "ArrowUp") {
+                e.preventDefault();
+                if (currentChannelIndex > 0) {
+                    selectChannel(currentChannelIndex - 1);
+                }
+            } else if (e.key === "ArrowDown") {
+                e.preventDefault();
+                if (currentChannelIndex < channels.length - 1) {
+                    selectChannel(currentChannelIndex + 1);
+                }
+            }
+        });
+
+        // Auto-select the first channel
+        if (channels.length > 0) {
+            selectChannel(0);
+        }
+    </script>
 </body>
 </html>
