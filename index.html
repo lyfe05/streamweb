@@ -374,7 +374,7 @@
                 });
                 hls.on(Hls.Events.ERROR, function (event, data) {
                     console.error("HLS error:", data);
-                    alert("Error loading channel: " + selectedChannel.name);
+                    //alert("Error loading channel: " + selectedChannel.name);
                 });
             } else if (videoPlayer.canPlayType("application/vnd.apple.mpegurl")) {
                 videoPlayer.src = selectedChannel.url;
