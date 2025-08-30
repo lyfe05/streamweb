@@ -63,43 +63,43 @@
     "id": "m_net_movies_1",
     "name": "M-Net Movies 1",
     "logoUrl": "https://github.com/lyfe05/RandomProject/blob/main/Images/mm1_black.png?raw=true",
-    "hlsUrl": "https://raw.githubusercontent.com/lyfe05/dlhd/refs/heads/main/Africa/M-Net_Movies_1.m3u8"
+    "hlsUrl": "https://eleven-streams.vercel.app/Africa/M-Net_Movies_1.m3u8"
   },
   {
     "id": "m_net_movies_2",
     "name": "M-Net Movies 2",
     "logoUrl": "https://github.com/lyfe05/RandomProject/blob/main/Images/mm2_black.png?raw=true",
-    "hlsUrl": "https://raw.githubusercontent.com/lyfe05/dlhd/refs/heads/main/Africa/M-Net_Movies_2.m3u8"
+    "hlsUrl": "https://eleven-streams.vercel.app/Africa/M-Net_Movies_2.m3u8"
   },
   {
     "id": "m_net_movies_3",
     "name": "M-Net Movies 3",
     "logoUrl": "https://github.com/lyfe05/RandomProject/blob/main/Images/mm3_black.png?raw=true",
-    "hlsUrl": "https://raw.githubusercontent.com/lyfe05/dlhd/refs/heads/main/Africa/M-Net_Movies_3.m3u8"
+    "hlsUrl": "https://eleven-streams.vercel.app/Africa/M-Net_Movies_3.m3u8"
   },
   {
     "id": "m_net_movies_4",
     "name": "M-Net Movies 4",
     "logoUrl": "https://github.com/lyfe05/RandomProject/blob/main/Images/mm4_black.png?raw=true",
-    "hlsUrl": "https://raw.githubusercontent.com/lyfe05/dlhd/refs/heads/main/Africa/M-Net_Movies_4.m3u8"
+    "hlsUrl": "https://eleven-streams.vercel.app/Africa/M-Net_Movies_4.m3u8"
   },
   {
     "id": "mtv_base",
     "name": "MTV Base",
     "logoUrl": "https://github.com/lyfe05/RandomProject/blob/main/Images/322-mtv-base-dark.png?raw=true",
-    "hlsUrl": "https://raw.githubusercontent.com/lyfe05/dlhd/refs/heads/main/Africa/MTV_Base.m3u8"
+    "hlsUrl": "https://eleven-streams.vercel.app/Africa/MTV_Base.m3u8"
   },
   {
     "id": "national_geographic",
     "name": "National Geographic",
     "logoUrl": "https://github.com/lyfe05/RandomProject/blob/main/Images/181-national-geographic-channel-dark.png?raw=true",
-    "hlsUrl": "https://raw.githubusercontent.com/lyfe05/dlhd/refs/heads/main/Africa/Nat_Geo.m3u8"
+    "hlsUrl": "https://eleven-streams.vercel.app/Africa/Nat_Geo.m3u8"
   },
   {
     "id": "national_geographic_wild",
     "name": "National Geographic wild",
     "logoUrl": "https://github.com/lyfe05/RandomProject/blob/main/Images/182-natgeo-wild-dark.png?raw=true",
-    "hlsUrl": "https://raw.githubusercontent.com/lyfe05/dlhd/refs/heads/main/Africa/Nat_Geo_Wild.m3u8"
+    "hlsUrl": "https://eleven-streams.vercel.app/Africa/Nat_Geo_Wild.m3u8"
   },
   {
     "id": "sky_cinema_action",
@@ -168,27 +168,27 @@
     "hlsUrl": "https://windnew.newkso.ru/wind/premium671/mono.m3u8"
   },
   {
+    "id": "studio_universal",
+    "name": "Studio Universal",
+    "logoUrl": "https://raw.githubusercontent.com/lyfe05/RandomProject/refs/heads/main/Images/112-studio-universal-dark.png",
+    "hlsUrl": "https://eleven-streams.vercel.app/Africa/Studio_Universal.m3u8"
+  },
+  {
     "id": "trace_gospel",
     "name": "Trace Gospel",
     "logoUrl": "https://github.com/lyfe05/RandomProject/blob/main/Images/trace-gospel-logo-set-1_320x320.png?raw=true",
-    "hlsUrl": "https://raw.githubusercontent.com/lyfe05/dlhd/refs/heads/main/Africa/Trace_Gospel.m3u8"
+    "hlsUrl": "https://eleven-streams.vercel.app/Africa/Trace_Gospel.m3u8"
   },
   {
     "id": "trace_mziki",
     "name": "Trace Mziki",
     "logoUrl": "https://github.com/lyfe05/RandomProject/blob/main/Images/trace-mziki-logo-set-1_320x320.png?raw=true",
-    "hlsUrl": "https://raw.githubusercontent.com/lyfe05/dlhd/refs/heads/main/Africa/Trace_Mziki.m3u8"
+    "hlsUrl": "https://eleven-streams.vercel.app/Africa/Trace_Mziki.m3u8"
   },
   {
     "id": "trace_naija",
     "name": "Trace Naija",
     "logoUrl": "https://github.com/lyfe05/RandomProject/blob/main/Images/trace-naija-logo-set-1_320x320.png?raw=true",
-    "hlsUrl": "https://raw.githubusercontent.com/lyfe05/dlhd/refs/heads/main/Africa/Trace_Naija.m3u8"
-  },
-  {
-    "id": "studio_universal",
-    "name": "Studio Universal",
-    "logoUrl": "https://raw.githubusercontent.com/lyfe05/RandomProject/refs/heads/main/Images/112-studio-universal-dark.png",
-    "hlsUrl": "https://raw.githubusercontent.com/lyfe05/dlhd/refs/heads/main/Africa/Studio_Universal.m3u8"
+    "hlsUrl": "https://eleven-streams.vercel.app/Africa/Trace_Naija.m3u8"
   }
 ]
