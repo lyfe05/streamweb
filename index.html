@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Welcome</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to right, #4facfe, #00f2fe);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
+    }
+    h1 {
+      font-size: 3em;
+      margin-bottom: 1em;
+    }
+    .button-group {
+      display: flex;
+      gap: 1em;
+      justify-content: center;
+    }
+    a.button {
+      text-decoration: none;
+      background-color: rgba(255, 255, 255, 0.2);
+      padding: 0.8em 1.5em;
+      border-radius: 8px;
+      color: #fff;
+      font-weight: bold;
+      transition: background-color 0.3s ease;
+    }
+    a.button:hover {
+      background-color: rgba(255, 255, 255, 0.4);
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <h1>Welcome</h1>
+    <div class="button-group">
+      <a href="/live.json" class="button">View Live</a>
+      <a href="/sports.json" class="button">View Sports</a>
+      <a href="/categories.json" class="button">View Categories</a>
+    </div>
+  </div>
+</body>
+</html>
