@@ -9,6 +9,9 @@ on:
     - cron: '0 2 * * *'  # Run daily at 2 AM UTC (5 AM GMT+3)
   workflow_dispatch:  # Allow manual triggering
 
+permissions:
+  contents: write  # Needed to push changes back to the repo
+
 jobs:
   generate-live-json:
     runs-on: ubuntu-latest
@@ -16,6 +19,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -58,73 +63,39 @@ jobs:
         import os
         from pathlib import Path
         
-        # Custom encoder (matches the JavaScript implementation)
         _CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef'
         
         def custom_encode(input_string):
-            '''Encode string using custom base32 encoding (matches JS implementation)'''
             input_bytes = input_string.encode('utf-8')
             output = []
             bit_buffer = 0
             bit_count = 0
-            
             for byte in input_bytes:
                 bit_buffer = (bit_buffer << 8) | byte
                 bit_count += 8
-                
                 while bit_count >= 5:
                     bit_count -= 5
                     value = (bit_buffer >> bit_count) & 0x1F
                     output.append(_CHARSET[value])
                     bit_buffer &= (1 << bit_count) - 1
-            
             if bit_count > 0:
                 bit_buffer <<= (5 - bit_count)
                 value = bit_buffer & 0x1F
                 output.append(_CHARSET[value])
                 output.append('=')
-            
             return ''.join(output)
         
-        # Read the generated JSON
         try:
             with open('output.json', 'r') as f:
                 json_data = f.read()
-            
-            print(f'Input JSON size: {len(json_data)} characters')
-            
-            # Validate it's valid JSON
-            parsed_json = json.loads(json_data)
-            print('✅ JSON is valid')
-            
-            # Encode the JSON
+            parsed_json = json.loads(json_data)  # Validate JSON
             encoded_data = custom_encode(json_data)
-            print(f'Encoded data size: {len(encoded_data)} characters')
-            print(f'First 50 chars of encoded: {encoded_data[:50]}')
-            
-            # Create public directory if it doesn't exist
             Path('public').mkdir(exist_ok=True)
-            
-            # Write encoded data to public/live.json (OVERWRITES existing file)
             with open('public/live.json', 'w') as f:
                 f.write(encoded_data)
-            
             print('✅ JSON successfully encoded and saved to public/live.json')
-            
-            # Verify the file was written
-            if os.path.exists('public/live.json'):
-                file_size = os.path.getsize('public/live.json')
-                print(f'✅ File created successfully, size: {file_size} bytes')
-            else:
-                print('❌ ERROR: File was not created')
-                exit(1)
-            
-        except json.JSONDecodeError as e:
-            print(f'❌ Error: Invalid JSON generated: {e}')
-            print(f'JSON content: {json_data[:200]}...')
-            exit(1)
         except Exception as e:
-            print(f'❌ Unexpected error: {e}')
+            print(f'❌ Error: {e}')
             exit(1)
         "
 
@@ -143,10 +114,11 @@ jobs:
         name: live-json
         path: public/live.json
 
-    - name: Deploy to GitHub Pages (optional)
+    - name: Commit and push changes to main
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./public
-        keep_files: true
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add public/live.json
+        git commit -m "Update live.json [skip ci]" || echo "No changes to commit"
+        git push
