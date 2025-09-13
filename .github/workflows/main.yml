@@ -3,8 +3,12 @@ name: Generate Live JSON
 on:
   push:
     branches: [ main, master ]
+    paths-ignore:
+      - 'public/*.json'
   pull_request:
     branches: [ main, master ]
+    paths-ignore:
+      - 'public/*.json'
   schedule:
     - cron: '0 2 * * *'  # Run daily at 2 AM UTC (5 AM GMT+3)
   workflow_dispatch:  # Allow manual triggering
@@ -52,24 +56,20 @@ jobs:
     - name: Encode JSON with custom base32
       id: encode-json
       run: |
-        # First, check if output.json exists and has content
         if [ ! -s output.json ]; then
           echo "❌ ERROR: output.json is empty or doesn't exist"
           exit 1
         fi
 
         python -c "
-        import json
-        import os
+        import json, os
         from pathlib import Path
-        
+
         _CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef'
         
         def custom_encode(input_string):
             input_bytes = input_string.encode('utf-8')
-            output = []
-            bit_buffer = 0
-            bit_count = 0
+            output, bit_buffer, bit_count = [], 0, 0
             for byte in input_bytes:
                 bit_buffer = (bit_buffer << 8) | byte
                 bit_count += 8
@@ -84,11 +84,11 @@ jobs:
                 output.append(_CHARSET[value])
                 output.append('=')
             return ''.join(output)
-        
+
         try:
             with open('output.json', 'r') as f:
                 json_data = f.read()
-            parsed_json = json.loads(json_data)  # Validate JSON
+            json.loads(json_data)  # Validate JSON
             encoded_data = custom_encode(json_data)
             Path('public').mkdir(exist_ok=True)
             with open('public/live.json', 'w') as f:
