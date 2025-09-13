@@ -27,17 +27,35 @@ jobs:
         python -m pip install --upgrade pip
         pip install aiohttp rapidfuzz
 
+    - name: Debug current directory
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "Directory contents:"
+        ls -la
+        echo "Public directory contents:"
+        ls -la public/ || echo "No public directory yet"
+
     - name: Run live_gen.py
       id: generate-json
       run: |
         python live_gen.py > output.json
         echo "JSON generated successfully"
+        echo "File size: $(wc -c < output.json) bytes"
+        echo "First 100 chars:"
+        head -c 100 output.json
 
     - name: Encode JSON with custom base32
       id: encode-json
       run: |
+        # First, check if output.json exists and has content
+        if [ ! -s output.json ]; then
+          echo "❌ ERROR: output.json is empty or doesn't exist"
+          exit 1
+        fi
+
         python -c "
         import json
+        import os
         from pathlib import Path
         
         # Custom encoder (matches the JavaScript implementation)
@@ -69,33 +87,61 @@ jobs:
             return ''.join(output)
         
         # Read the generated JSON
-        with open('output.json', 'r') as f:
-            json_data = f.read()
-        
-        # Validate it's valid JSON
         try:
-            json.loads(json_data)
+            with open('output.json', 'r') as f:
+                json_data = f.read()
+            
+            print(f'Input JSON size: {len(json_data)} characters')
+            
+            # Validate it's valid JSON
+            parsed_json = json.loads(json_data)
+            print('✅ JSON is valid')
+            
+            # Encode the JSON
             encoded_data = custom_encode(json_data)
+            print(f'Encoded data size: {len(encoded_data)} characters')
+            print(f'First 50 chars of encoded: {encoded_data[:50]}')
             
             # Create public directory if it doesn't exist
             Path('public').mkdir(exist_ok=True)
             
-            # Write encoded data to public/live.json
+            # Write encoded data to public/live.json (OVERWRITES existing file)
             with open('public/live.json', 'w') as f:
                 f.write(encoded_data)
             
             print('✅ JSON successfully encoded and saved to public/live.json')
             
+            # Verify the file was written
+            if os.path.exists('public/live.json'):
+                file_size = os.path.getsize('public/live.json')
+                print(f'✅ File created successfully, size: {file_size} bytes')
+            else:
+                print('❌ ERROR: File was not created')
+                exit(1)
+            
         except json.JSONDecodeError as e:
             print(f'❌ Error: Invalid JSON generated: {e}')
+            print(f'JSON content: {json_data[:200]}...')
+            exit(1)
+        except Exception as e:
+            print(f'❌ Unexpected error: {e}')
             exit(1)
         "
 
-    - name: Verify encoded file
+    - name: Verify encoded file was created
       run: |
-        echo "Encoded file contents:"
-        head -c 100 public/live.json
-        echo -e "\n\nFile size: $(wc -c < public/live.json) bytes"
+        echo "Checking public/live.json:"
+        ls -la public/live.json
+        echo "File size: $(wc -c < public/live.json) bytes"
+        echo "First 50 characters:"
+        head -c 50 public/live.json
+        echo -e "\n"
+
+    - name: Upload encoded JSON as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: live-json
+        path: public/live.json
 
     - name: Deploy to GitHub Pages (optional)
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
@@ -104,9 +150,3 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./public
         keep_files: true
-
-    - name: Upload encoded JSON as artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: live-json
-        path: public/live.json
