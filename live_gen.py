@@ -2,10 +2,10 @@
 """
 Async sport-stream scraper – final unified version.
 - decodes the two encoded JSON sources
-- ingests the new plain-text “streaming.txt” (with <url …> tags)
+- ingests the new plain-text “streaming.txt” (with name/url entries)
 - fetches every *.m3u8 to verify it is really alive
 - merges everything into the same JSON schema
-- NEW: *appends* plain .m3u8 links (normalized names for better matching)
+- NEW: appends plain .m3u8 links (normalized names, numbered labels)
 """
 
 from __future__ import annotations
@@ -15,8 +15,7 @@ import json
 import logging
 import re
 from functools import lru_cache
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import aiohttp
 from rapidfuzz import fuzz
@@ -73,7 +72,7 @@ async def fetch_text(session: aiohttp.ClientSession, url: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# NEW: normalize keys for better matching                                     #
+# Normalize keys                                                              #
 # --------------------------------------------------------------------------- #
 def normalize_key(name: str) -> str:
     """Guinea-Bissau Vs Djibouti → guineabissauvsdjibouti"""
@@ -81,13 +80,14 @@ def normalize_key(name: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# NEW: parse the plain-text “streaming.txt” (with <url …> tags)               #
+# Parse the plain-text “streaming.txt”                                        #
 # --------------------------------------------------------------------------- #
 def parse_plain_streaming(text: str) -> Dict[str, List[str]]:
     """
-    name: Belarus Vs Scotland
-    url: <url id=...>https://....m3u8</url>
-    -> {"belarusvsscotland": ["https://....m3u8", "https://....m3u8"]}
+    Example:
+      name: Benfica Vs Qaraba
+      url: https://.../benfica_vs_qaraba_.m3u8
+    -> {"benficavsqaraba": ["https://...m3u8", "https://...m3u8"]}
     """
     buckets: Dict[str, List[str]] = {}
     current_key = ""
@@ -105,7 +105,7 @@ def parse_plain_streaming(text: str) -> Dict[str, List[str]]:
 
 
 # --------------------------------------------------------------------------- #
-# NEW: lightweight HEAD check for m3u8                                        #
+# Lightweight HEAD check for m3u8                                             #
 # --------------------------------------------------------------------------- #
 async def url_is_alive(session: aiohttp.ClientSession, url: str) -> bool:
     try:
@@ -125,16 +125,10 @@ async def filter_alive_urls(
 
 
 # --------------------------------------------------------------------------- #
-# Channel list builder  (old encoded JSONs only)                             #
+# Channel list builder  (old encoded JSONs only)                              #
 # --------------------------------------------------------------------------- #
 async def build_channel_map(session: aiohttp.ClientSession) -> Dict[str, str]:
-    """
-    Merge only the *old encoded JSONs* -> {name: url}.
-    Keep only **first alive** URL per name.
-    """
     merged: Dict[str, List[str]] = {}
-
-    # old encoded JSONs
     old_urls = [
         "https://streamweb-bay.vercel.app/sports.json",
         "https://streamweb-bay.vercel.app/channels1.json",
@@ -150,7 +144,6 @@ async def build_channel_map(session: aiohttp.ClientSession) -> Dict[str, str]:
             if name and url:
                 merged.setdefault(name, []).append(url)
 
-    # collapse to a single **alive** URL per name
     cleaned: Dict[str, str] = {}
     for name, urls in merged.items():
         alive = await filter_alive_urls(session, urls)
@@ -163,9 +156,7 @@ async def build_channel_map(session: aiohttp.ClientSession) -> Dict[str, str]:
 # --------------------------------------------------------------------------- #
 # Match parser                                                                #
 # --------------------------------------------------------------------------- #
-MATCH_REGEX = re.compile(
-    r"🏟️ Match:\s*(?P<home>.+?)\s*Vs\s*(?P<away>.+?)\s*$"
-)
+MATCH_REGEX = re.compile(r"🏟️ Match:\s*(?P<home>.+?)\s*Vs\s*(?P<away>.+?)\s*$")
 TIME_REGEX = re.compile(r"🕒 Start:\s*(?P<date>\d{4}-\d{2}-\d{2})\s+(?P<time>\d{2}:\d{2})")
 TOURNAMENT_REGEX = re.compile(r"📍 Tournament:\s*(?P<t>.+?)\s*$")
 CHANNELS_REGEX = re.compile(r"📺 Channels:\s*(?P<c>.+?)\s*$")
@@ -175,7 +166,6 @@ SCORE_REGEX = re.compile(r"⚽ Score:\s*(?P<s>\d+\s*\|\s*\d+)")
 
 
 def parse_matches(text: str) -> List[Dict[str, Any]]:
-    """Parse the big text blob into list of match dicts."""
     matches: List[Dict[str, Any]] = []
     cur: Dict[str, Any] = {}
 
@@ -229,17 +219,15 @@ def parse_matches(text: str) -> List[Dict[str, Any]]:
 
 
 # --------------------------------------------------------------------------- #
-# Channel matcher  (legacy channels)                                         #
+# Channel matcher                                                             #
 # --------------------------------------------------------------------------- #
 @lru_cache(maxsize=2048)
 def _fuzzy(url: str, name: str) -> Optional[str]:
-    """Cached fuzzy helper."""
     score = fuzz.ratio(name, url)
     return url if score > 85 else None
 
 
 def attach_stream_urls(matches: List[Dict[str, Any]], channel_map: Dict[str, str]) -> None:
-    """In-place attach stream objects to every match."""
     for m in matches:
         streams: List[Dict[str, str]] = []
         for ch in m.get("channels", []):
@@ -283,14 +271,14 @@ def build_final_json(matches: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 # --------------------------------------------------------------------------- #
-# NEW: *append* plain .m3u8 links with normalization                         #
+# Append plain .m3u8 links (numbered labels)                                  #
 # --------------------------------------------------------------------------- #
 async def merge_plain_m3u8(
     matches: List[Dict[str, Any]], plain_buckets: Dict[str, List[str]]
 ) -> None:
     """
-    If a match home-vs-away string (lower-cased + normalized) exists in plain_buckets,
-    *append* **all alive** .m3u8 URLs to the already existing streams array.
+    Append **all alive** .m3u8 URLs from plain_buckets.
+    Each one is labeled as key-1, key-2, ...
     """
     async with aiohttp.ClientSession() as session:
         for m in matches:
@@ -298,15 +286,20 @@ async def merge_plain_m3u8(
             urls = plain_buckets.get(key, [])
             if not urls:
                 continue
+
             alive = await filter_alive_urls(session, urls)
             existing_urls = {s["url"] for s in m.get("streams", [])}
+
+            counter = 1
             for u in alive:
                 if u not in existing_urls:
-                    m.setdefault("streams", []).append({"name": key, "url": u})
+                    label = f"{key}-{counter}"
+                    m.setdefault("streams", []).append({"name": label, "url": u})
+                    counter += 1
 
 
 # --------------------------------------------------------------------------- #
-# Tiny helper to collect the plain buckets once
+# Collect plain buckets                                                       #
 # --------------------------------------------------------------------------- #
 async def get_plain_buckets() -> Dict[str, List[str]]:
     async with aiohttp.ClientSession() as session:
@@ -322,15 +315,14 @@ async def get_plain_buckets() -> Dict[str, List[str]]:
 # --------------------------------------------------------------------------- #
 async def main() -> List[Dict[str, Any]]:
     async with aiohttp.ClientSession() as session:
-        channel_map = await build_channel_map(session)          # old JSON sources
+        channel_map = await build_channel_map(session)
         raw_matches = await fetch_text(
             session,
             "https://raw.githubusercontent.com/lyfe05/lyfe05/refs/heads/main/matches.txt",
         )
         matches = parse_matches(raw_matches)
-        attach_stream_urls(matches, channel_map)                # legacy channels
+        attach_stream_urls(matches, channel_map)
 
-        # ---- NEW: append ALL alive plain .m3u8 when available ----
         plain_buckets = await get_plain_buckets()
         await merge_plain_m3u8(matches, plain_buckets)
 
