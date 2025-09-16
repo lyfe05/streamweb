@@ -77,11 +77,7 @@ async def fetch_text(session: aiohttp.ClientSession, url: str) -> str:
 # --------------------------------------------------------------------------- #
 def normalize_key(name: str) -> str:
     """Guinea-Bissau Vs Djibouti → guineabissauvsdjibouti"""
-    # Remove all non-alphanumeric characters and convert to lowercase
-    normalized = re.sub(r"[^a-z0-9]", "", name.lower())
-    # Handle common special characters and variations
-    normalized = normalized.replace("ğ", "g").replace("ı", "i").replace("ş", "s").replace("ç", "c").replace("ö", "o").replace("ü", "u")
-    return normalized
+    return re.sub(r"[^a-z0-9]", "", name.lower()).replace("-", "")
 
 
 # --------------------------------------------------------------------------- #
@@ -89,22 +85,28 @@ def normalize_key(name: str) -> str:
 # --------------------------------------------------------------------------- #
 def parse_plain_streaming(text: str) -> Dict[str, List[str]]:
     """
-    Parse streaming.txt and preserve all entries, including numbered ones.
+    name: Benfica Vs Qaraba
+    url: <url …>https://….m3u8</url>
+    -> {"benficavsqaraba": ["https://…/benfica_vs_qaraba_.m3u8",
+                            "https://…/benfica_vs_qaraba__2_1.m3u8"]}
     """
     buckets: Dict[str, List[str]] = {}
     current_key = ""
 
     for line in text.splitlines():
         line = line.strip()
-        if line.startswith("name:"):
-            raw = line.replace("name:", "").strip()
-            current_key = raw  # Keep the original name with numbers
-        elif line.startswith("url:") and current_key:
-            urls = re.findall(r"https://\S+\.m3u8", line)
-            for u in urls:
-                if current_key not in buckets:
-                    buckets[current_key] = []
-                buckets[current_key].append(u)
+        if not line:
+            continue
+
+        if line.lower().startswith("name:"):
+            raw = line[5:].strip()
+            current_key = normalize_key(raw)
+
+        elif line.lower().startswith("url:") and current_key:
+            urls = re.findall(r"https?://\S+\.m3u8", line)
+            if urls:  # ➜ extend keeps every URL for that match
+                buckets.setdefault(current_key, []).extend(urls)
+
     return buckets
 
 
@@ -210,17 +212,17 @@ def parse_matches(text: str) -> List[Dict[str, Any]]:
             cur["channels"] = [c.strip() for c in m["c"].split(",") if c.strip()]
             continue
 
-        m = HOME_LOGO_REGEX.search(line)
+        m = HOME_LOGO_REGEX.match(line)
         if m:
             cur["home_logo"] = m["url"]
             continue
 
-        m = AWAY_LOGO_REGEX.search(line)
+        m = AWAY_LOGO_REGEX.match(line)
         if m:
             cur["away_logo"] = m["url"]
             continue
 
-        m = SCORE_REGEX.search(line)
+        m = SCORE_REGEX.match(line)
         if m:
             cur["score"] = m["s"].replace(" ", "")
             continue
@@ -290,53 +292,37 @@ def build_final_json(matches: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 # NEW: *append* plain .m3u8 links with normalization                         #
 # --------------------------------------------------------------------------- #
 async def merge_plain_m3u8(
-    session: aiohttp.ClientSession,
-    matches: List[Dict[str, Any]], 
-    plain_buckets: Dict[str, List[str]]
+    matches: List[Dict[str, Any]], plain_buckets: Dict[str, List[str]]
 ) -> None:
     """
-    Match streams by trying multiple key variations.
+    If a match home-vs-away string (lower-cased + normalized) exists in plain_buckets,
+    *append* **all alive** .m3u8 URLs to the already existing streams array.
     """
-    for m in matches:
-        match_name = f"{m['home']} Vs {m['away']}"
-        base_match_name = re.sub(r'\s+\d+$', '', match_name)  # Base name without numbers
-        
-        # Try multiple matching strategies
-        possible_keys = [
-            match_name,  # Exact match with "Vs"
-            f"{m['home']} vs {m['away']}",  # Lowercase "vs"
-            f"{m['home']} v {m['away']}",   # Short "v"
-            base_match_name,  # Base name without numbers
-        ]
-        
-        # Also try normalized versions
-        possible_keys.extend([normalize_key(key) for key in possible_keys])
-        
-        # Remove duplicates
-        possible_keys = list(set(possible_keys))
-        
-        for key in possible_keys:
+    async with aiohttp.ClientSession() as session:
+        for m in matches:
+            key = normalize_key(f"{m['home']} Vs {m['away']}")
             urls = plain_buckets.get(key, [])
-            if urls:
-                alive = await filter_alive_urls(session, urls)
-                existing_urls = {s["url"] for s in m.get("streams", [])}
-                for u in alive:
-                    if u not in existing_urls:
-                        # Use the original stream name from plain_buckets
-                        stream_name = f"Direct Stream {len([s for s in m.get('streams', []) if s['name'].startswith('Direct Stream')]) + 1}"
-                        m.setdefault("streams", []).append({"name": stream_name, "url": u})
-                break  # Stop after first successful match
+            if not urls:
+                continue
+            alive = await filter_alive_urls(session, urls)
+            existing_urls = {s["url"] for s in m.get("streams", [])}
+            for idx, u in enumerate(alive, 1):
+                if u not in existing_urls:
+                    m.setdefault("streams", []).append(
+                        {"name": f"{key}-{idx}", "url": u}
+                    )
 
 
 # --------------------------------------------------------------------------- #
 # Tiny helper to collect the plain buckets once
 # --------------------------------------------------------------------------- #
-async def get_plain_buckets(session: aiohttp.ClientSession) -> Dict[str, List[str]]:
-    text = await fetch_text(
-        session,
-        "https://raw.githubusercontent.com/lyfe05/Temp/refs/heads/main/streaming.txt",
-    )
-    return parse_plain_streaming(text)
+async def get_plain_buckets() -> Dict[str, List[str]]:
+    async with aiohttp.ClientSession() as session:
+        text = await fetch_text(
+            session,
+            "https://raw.githubusercontent.com/lyfe05/Temp/refs/heads/main/streaming.txt",
+        )
+        return parse_plain_streaming(text)
 
 
 # --------------------------------------------------------------------------- #
@@ -344,17 +330,17 @@ async def get_plain_buckets(session: aiohttp.ClientSession) -> Dict[str, List[st
 # --------------------------------------------------------------------------- #
 async def main() -> List[Dict[str, Any]]:
     async with aiohttp.ClientSession() as session:
-        channel_map = await build_channel_map(session)          # old JSON sources
+        channel_map = await build_channel_map(session)  # old JSON sources
         raw_matches = await fetch_text(
             session,
             "https://raw.githubusercontent.com/lyfe05/lyfe05/refs/heads/main/matches.txt",
         )
         matches = parse_matches(raw_matches)
-        attach_stream_urls(matches, channel_map)                # legacy channels
+        attach_stream_urls(matches, channel_map)  # legacy channels
 
         # ---- NEW: append ALL alive plain .m3u8 when available ----
-        plain_buckets = await get_plain_buckets(session)
-        await merge_plain_m3u8(session, matches, plain_buckets)
+        plain_buckets = await get_plain_buckets()
+        await merge_plain_m3u8(matches, plain_buckets)
 
         return build_final_json(matches)
 
@@ -368,3 +354,4 @@ if __name__ == "__main__":
         print(json.dumps(final, indent=2, ensure_ascii=False))
     except KeyboardInterrupt:
         log.warning("Aborted by user")
+    
