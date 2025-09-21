@@ -1,0 +1,4 @@
+live = https://streamweb-bay.vercel.app/live.json
+sports = https://streamweb-bay.vercel.app/sports.json
+categories = https://streamweb-bay.vercel.app/categories.json
+api = https://stream-api-11.onrender.com/matches
