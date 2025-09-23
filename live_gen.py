@@ -5,7 +5,7 @@ Async sport-stream scraper – final unified version.
 - ingests the new plain-text “streaming.txt” (with <url …> tags)
 - fetches every *.m3u8 to verify it is really alive
 - merges everything into the same JSON schema
-- NEW: *appends* plain .m3u8 links (normalized names for better matching)
+- appends plain .m3u8 links (normalized names for better matching)
 """
 
 from __future__ import annotations
@@ -14,12 +14,13 @@ import asyncio
 import json
 import logging
 import re
+import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import aiohttp
-from rapidfuzz import fuzz
+from rapidfuzz import process, fuzz
 
 # --------------------------------------------------------------------------- #
 # Logging                                                                     #
@@ -73,15 +74,15 @@ async def fetch_text(session: aiohttp.ClientSession, url: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# NEW: normalize keys for better matching                                     #
+# Normalize keys for better matching                                          #
 # --------------------------------------------------------------------------- #
 def normalize_key(name: str) -> str:
     """Guinea-Bissau Vs Djibouti → guineabissauvsdjibouti"""
-    return re.sub(r"[^a-z0-9]", "", name.lower()).replace("-", "")
+    return re.sub(r"[^a-z0-9]", "", name.lower())
 
 
 # --------------------------------------------------------------------------- #
-# NEW: parse the plain-text “streaming.txt” (with <url …> tags)               #
+# Parse the plain-text “streaming.txt” (with <url …> tags)                    #
 # --------------------------------------------------------------------------- #
 def parse_plain_streaming(text: str) -> Dict[str, List[str]]:
     """
@@ -91,7 +92,7 @@ def parse_plain_streaming(text: str) -> Dict[str, List[str]]:
                             "https://…/benfica_vs_qaraba__2_1.m3u8"]}
     """
     buckets: Dict[str, List[str]] = {}
-    current_key = ""
+    current_key = None
 
     for line in text.splitlines():
         line = line.strip()
@@ -101,21 +102,23 @@ def parse_plain_streaming(text: str) -> Dict[str, List[str]]:
         if line.lower().startswith("name:"):
             raw = line[5:].strip()
             current_key = normalize_key(raw)
+            buckets.setdefault(current_key, [])  # ensure list exists
 
         elif line.lower().startswith("url:") and current_key:
-            urls = re.findall(r"https?://\S+\.m3u8", line)
-            if urls:  # ➜ extend keeps every URL for that match
-                buckets.setdefault(current_key, []).extend(urls)
+            for url in re.findall(r"https?://\S+\.m3u8", line):
+                buckets[current_key].append(url)  # keep every URL
 
     return buckets
 
 
 # --------------------------------------------------------------------------- #
-# NEW: lightweight HEAD check for m3u8                                        #
+# Lightweight HEAD check for m3u8                                             #
 # --------------------------------------------------------------------------- #
 async def url_is_alive(session: aiohttp.ClientSession, url: str) -> bool:
     try:
-        async with session.head(url, timeout=8) as resp:
+        async with session.head(
+            url, ssl=False, timeout=aiohttp.ClientTimeout(total=5)
+        ) as resp:
             return 200 <= resp.status < 400
     except Exception:
         return False
@@ -169,15 +172,13 @@ async def build_channel_map(session: aiohttp.ClientSession) -> Dict[str, str]:
 # --------------------------------------------------------------------------- #
 # Match parser                                                                #
 # --------------------------------------------------------------------------- #
-MATCH_REGEX = re.compile(
-    r"🏟️ Match:\s*(?P<home>.+?)\s*Vs\s*(?P<away>.+?)\s*$"
-)
-TIME_REGEX = re.compile(r"🕒 Start:\s*(?P<date>\d{4}-\d{2}-\d{2})\s+(?P<time>\d{2}:\d{2})")
-TOURNAMENT_REGEX = re.compile(r"📍 Tournament:\s*(?P<t>.+?)\s*$")
-CHANNELS_REGEX = re.compile(r"📺 Channels:\s*(?P<c>.+?)\s*$")
-HOME_LOGO_REGEX = re.compile(r"🖼️ Home Logo:\s*(?P<url>\S+)")
-AWAY_LOGO_REGEX = re.compile(r"🖼️ Away Logo:\s*(?P<url>\S+)")
-SCORE_REGEX = re.compile(r"⚽ Score:\s*(?P<s>\d+\s*\|\s*\d+)")
+MATCH_REGEX = re.compile(r"🏟️\s*Match:\s*(.+?)\s+Vs\s+(.+?)\s*$", re.I)
+TIME_REGEX = re.compile(r"🕒\s*Start:\s*(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})", re.I)
+TOURNAMENT_REGEX = re.compile(r"📍\s*Tournament:\s*(.+?)\s*$", re.I)
+CHANNELS_REGEX = re.compile(r"📺\s*Channels:\s*(.+?)\s*$", re.I)
+HOME_LOGO_REGEX = re.compile(r"🖼️\s*Home\s*Logo:\s*(\S+)", re.I)
+AWAY_LOGO_REGEX = re.compile(r"🖼️\s*Away\s*Logo:\s*(\S+)", re.I)
+SCORE_REGEX = re.compile(r"⚽\s*Score:\s*(\d+\s*\|\s*\d+)", re.I)
 
 
 def parse_matches(text: str) -> List[Dict[str, Any]]:
@@ -194,37 +195,37 @@ def parse_matches(text: str) -> List[Dict[str, Any]]:
         if m:
             if cur:
                 matches.append(cur)
-            cur = {"home": m["home"], "away": m["away"]}
+            cur = {"home": m.group(1), "away": m.group(2)}
             continue
 
         m = TIME_REGEX.search(line)
         if m:
-            cur["date"], cur["time"] = m["date"], m["time"]
+            cur["date"], cur["time"] = m.groups()
             continue
 
         m = TOURNAMENT_REGEX.match(line)
         if m:
-            cur["tournament"] = m["t"]
+            cur["tournament"] = m.group(1)
             continue
 
         m = CHANNELS_REGEX.search(line)
         if m:
-            cur["channels"] = [c.strip() for c in m["c"].split(",") if c.strip()]
+            cur["channels"] = [c.strip() for c in m.group(1).split(",") if c.strip()]
             continue
 
-        m = HOME_LOGO_REGEX.match(line)
+        m = HOME_LOGO_REGEX.search(line)
         if m:
-            cur["home_logo"] = m["url"]
+            cur["home_logo"] = m.group(1)
             continue
 
-        m = AWAY_LOGO_REGEX.match(line)
+        m = AWAY_LOGO_REGEX.search(line)
         if m:
-            cur["away_logo"] = m["url"]
+            cur["away_logo"] = m.group(1)
             continue
 
-        m = SCORE_REGEX.match(line)
+        m = SCORE_REGEX.search(line)
         if m:
-            cur["score"] = m["s"].replace(" ", "")
+            cur["score"] = m.group(1).replace(" ", "")
             continue
 
     if cur:
@@ -237,20 +238,20 @@ def parse_matches(text: str) -> List[Dict[str, Any]]:
 # --------------------------------------------------------------------------- #
 # Channel matcher  (legacy channels)                                         #
 # --------------------------------------------------------------------------- #
-@lru_cache(maxsize=2048)
-def _fuzzy(url: str, name: str) -> Optional[str]:
-    """Cached fuzzy helper."""
-    score = fuzz.ratio(name, url)
-    return url if score > 85 else None
-
-
 def attach_stream_urls(matches: List[Dict[str, Any]], channel_map: Dict[str, str]) -> None:
     """In-place attach stream objects to every match."""
+    channels_lower = {k.lower(): v for k, v in channel_map.items()}
     for m in matches:
         streams: List[Dict[str, str]] = []
         for ch in m.get("channels", []):
             ch_low = ch.lower()
-            url = channel_map.get(ch_low) or _fuzzy(channel_map.get(ch_low, ""), ch_low)
+            url = channels_lower.get(ch_low)
+            if not url:  # fuzzy fallback
+                match, score, _ = process.extractOne(
+                    ch_low, channels_lower.keys(), scorer=fuzz.ratio
+                )
+                if score > 85:
+                    url = channels_lower[match]
             if url:
                 streams.append({"name": ch, "url": url})
         m["streams"] = streams
@@ -289,60 +290,57 @@ def build_final_json(matches: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 # --------------------------------------------------------------------------- #
-# NEW: *append* plain .m3u8 links with normalization                         #
+# Append plain .m3u8 links with normalization                               #
 # --------------------------------------------------------------------------- #
 async def merge_plain_m3u8(
-    matches: List[Dict[str, Any]], plain_buckets: Dict[str, List[str]]
+    session: aiohttp.ClientSession,
+    matches: List[Dict[str, Any]],
+    plain_buckets: Dict[str, List[str]],
 ) -> None:
     """
     If a match home-vs-away string (lower-cased + normalized) exists in plain_buckets,
-    *append* **all alive** .m3u8 URLs to the already existing streams array.
+    append **all alive** .m3u8 URLs to the already existing streams array.
     """
-    async with aiohttp.ClientSession() as session:
-        for m in matches:
-            key = normalize_key(f"{m['home']} Vs {m['away']}")
-            urls = plain_buckets.get(key, [])
-            if not urls:
-                continue
-            alive = await filter_alive_urls(session, urls)
-            existing_urls = {s["url"] for s in m.get("streams", [])}
-            for idx, u in enumerate(alive, 1):
-                if u not in existing_urls:
-                    m.setdefault("streams", []).append(
-                        {"name": f"{key}-{idx}", "url": u}
-                    )
-
-
-# --------------------------------------------------------------------------- #
-# Tiny helper to collect the plain buckets once
-# --------------------------------------------------------------------------- #
-async def get_plain_buckets() -> Dict[str, List[str]]:
-    async with aiohttp.ClientSession() as session:
-        text = await fetch_text(
-            session,
-            "https://raw.githubusercontent.com/lyfe05/Temp/refs/heads/main/streaming.txt",
-        )
-        return parse_plain_streaming(text)
+    for m in matches:
+        key = normalize_key(f"{m['home']} Vs {m['away']}")
+        urls = plain_buckets.get(key, [])
+        if not urls:
+            continue
+        alive = await filter_alive_urls(session, urls)
+        existing_urls = {s["url"] for s in m.get("streams", [])}
+        for idx, u in enumerate(alive, 1):
+            if u not in existing_urls:
+                m.setdefault("streams", []).append(
+                    {"name": f"{key}-{idx}", "url": u}
+                )
 
 
 # --------------------------------------------------------------------------- #
 # Async pipeline                                                              #
 # --------------------------------------------------------------------------- #
 async def main() -> List[Dict[str, Any]]:
-    async with aiohttp.ClientSession() as session:
-        channel_map = await build_channel_map(session)  # old JSON sources
+    timeout = aiohttp.ClientTimeout(total=15)
+    connector = aiohttp.TCPConnector(limit=100, limit_per_host=20)
+    async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+        channel_map = await build_channel_map(session)
         raw_matches = await fetch_text(
             session,
             "https://raw.githubusercontent.com/lyfe05/lyfe05/refs/heads/main/matches.txt",
         )
         matches = parse_matches(raw_matches)
-        attach_stream_urls(matches, channel_map)  # legacy channels
+        attach_stream_urls(matches, channel_map)
 
-        # ---- NEW: append ALL alive plain .m3u8 when available ----
-        plain_buckets = await get_plain_buckets()
-        await merge_plain_m3u8(matches, plain_buckets)
+        plain_text = await fetch_text(
+            session,
+            "https://raw.githubusercontent.com/lyfe05/Temp/refs/heads/main/streaming.txt",
+        )
+        plain_buckets = parse_plain_streaming(plain_text)
+        await merge_plain_m3u8(session, matches, plain_buckets)
 
-        return build_final_json(matches)
+        final = build_final_json(matches)
+        log.info("Scrape finished – %d matches, %d total streams",
+                 len(final), sum(len(m["streams"]) for m in final))
+        return final
 
 
 # --------------------------------------------------------------------------- #
@@ -354,4 +352,4 @@ if __name__ == "__main__":
         print(json.dumps(final, indent=2, ensure_ascii=False))
     except KeyboardInterrupt:
         log.warning("Aborted by user")
-    
+        
