@@ -1,0 +1,124 @@
+name: Generate Live JSON
+
+on:
+  push:
+    branches: [ main, master ]
+    paths-ignore:
+      - 'public/*.json'
+  pull_request:
+    branches: [ main, master ]
+    paths-ignore:
+      - 'public/*.json'
+  schedule:
+    - cron: '0 6 * * *'  # Run daily at 2 AM UTC (5 AM GMT+3)
+  workflow_dispatch:  # Allow manual triggering
+
+permissions:
+  contents: write  # Needed to push changes back to the repo
+
+jobs:
+  generate-live-json:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install aiohttp rapidfuzz
+
+    - name: Debug current directory
+      run: |
+        echo "Current directory: $(pwd)"
+        echo "Directory contents:"
+        ls -la
+        echo "Public directory contents:"
+        ls -la public/ || echo "No public directory yet"
+
+    - name: Run live_gen1.py
+      id: generate-json
+      run: |
+        python live_gen1.py > output.json
+        echo "JSON generated successfully"
+        echo "File size: $(wc -c < output.json) bytes"
+        echo "First 100 chars:"
+        head -c 100 output.json
+
+    - name: Encode JSON with custom base32
+      id: encode-json
+      run: |
+        if [ ! -s output.json ]; then
+          echo "❌ ERROR: output.json is empty or doesn't exist"
+          exit 1
+        fi
+
+        python -c "
+        import json, os
+        from pathlib import Path
+
+        _CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef'
+        
+        def custom_encode(input_string):
+            input_bytes = input_string.encode('utf-8')
+            output, bit_buffer, bit_count = [], 0, 0
+            for byte in input_bytes:
+                bit_buffer = (bit_buffer << 8) | byte
+                bit_count += 8
+                while bit_count >= 5:
+                    bit_count -= 5
+                    value = (bit_buffer >> bit_count) & 0x1F
+                    output.append(_CHARSET[value])
+                    bit_buffer &= (1 << bit_count) - 1
+            if bit_count > 0:
+                bit_buffer <<= (5 - bit_count)
+                value = bit_buffer & 0x1F
+                output.append(_CHARSET[value])
+                output.append('=')
+            return ''.join(output)
+
+        try:
+            with open('output.json', 'r') as f:
+                json_data = f.read()
+            json.loads(json_data)  # Validate JSON
+            encoded_data = custom_encode(json_data)
+            Path('public').mkdir(exist_ok=True)
+            with open('public/live1.json', 'w') as f:
+                f.write(encoded_data)
+            print('✅ JSON successfully encoded and saved to public/live1.json')
+        except Exception as e:
+            print(f'❌ Error: {e}')
+            exit(1)
+        "
+
+    - name: Verify encoded file was created
+      run: |
+        echo "Checking public/live1.json:"
+        ls -la public/live1.json
+        echo "File size: $(wc -c < public/live1.json) bytes"
+        echo "First 50 characters:"
+        head -c 50 public/live1.json
+        echo -e "\n"
+
+    - name: Upload encoded JSON as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: live-json
+        path: public/live1.json
+
+    - name: Commit and push changes to main
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add public/live1.json
+        git commit -m "Update live1.json [skip ci]" || echo "No changes to commit"
+        git push
