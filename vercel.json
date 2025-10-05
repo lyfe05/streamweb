@@ -4,5 +4,14 @@
       "source": "/highlights.json",
       "destination": "https://streamxi-highlight.onrender.com/matches"
     }
+  ],
+  "headers": [
+    {
+      "source": "/highlights.json",
+      "headers": [
+        { "key": "Authorization", "value": "Bearer X7pL9qW3zT2rY8mN5kV0jF6hB" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
+      ]
+    }
   ]
 }
