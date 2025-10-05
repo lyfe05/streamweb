@@ -1,9 +1,8 @@
 {
-  "redirects": [
+  "rewrites": [
     {
       "source": "/highlights.json",
-      "destination": "https://streamxi-highlight.onrender.com/matches",
-      "permanent": true
+      "destination": "https://streamxi-highlight.onrender.com/matches"
     }
   ]
 }
