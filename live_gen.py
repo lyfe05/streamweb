@@ -145,7 +145,7 @@ async def build_channel_map(session: aiohttp.ClientSession) -> Dict[str, str]:
 
     # old encoded JSONs
     old_urls = [
-        "https://streamweb-bay.vercel.app/sports.json",
+        "https://streamweb-bay.vercel.app/sports1.json",
         "https://streamweb-bay.vercel.app/channels1.json",
     ]
     for u in old_urls:
