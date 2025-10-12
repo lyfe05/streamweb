@@ -134,30 +134,52 @@ async def filter_alive_urls(
 
 
 # --------------------------------------------------------------------------- #
-# Channel list builder  (old encoded JSONs only)                             #
+# Channel list builder  (mixed JSON formats)                                  #
 # --------------------------------------------------------------------------- #
 async def build_channel_map(session: aiohttp.ClientSession) -> Dict[str, str]:
     """
-    Merge only the *old encoded JSONs* -> {name: url}.
+    Merge both JSON sources -> {name: url}.
+    - sports.json: new format with stream_urls array
+    - channels1.json: old format with hlsUrl string
     Keep only **first alive** URL per name.
     """
     merged: Dict[str, List[str]] = {}
 
-    # old encoded JSONs
-    old_urls = [
-        "https://streamweb-bay.vercel.app/sports1.json",
-        "https://streamweb-bay.vercel.app/channels1.json",
-    ]
-    for u in old_urls:
-        log.info("Downloading JSON (encoded) %s", u)
-        raw = await fetch_text(session, u)
-        decoded = decode_payload(raw)
-        channels: List[Dict[str, str]] = json.loads(decoded)
-        for ch in channels:
-            name = ch.get("name", "").strip().lower()
-            url = ch.get("hlsUrl", "").strip()
-            if name and url:
-                merged.setdefault(name, []).append(url)
+    # Process sports.json (NEW format)
+    sports_url = "https://streamweb-bay.vercel.app/sports.json"
+    log.info("Downloading JSON (new format) %s", sports_url)
+    raw = await fetch_text(session, sports_url)
+    decoded = decode_payload(raw)
+    channels: List[Dict[str, Any]] = json.loads(decoded)
+    
+    for ch in channels:
+        name = ch.get("name", "").strip().lower()
+        stream_urls = ch.get("stream_urls", [])
+        
+        if name and stream_urls:
+            # Take only the first m3u8 URL from stream_urls
+            first_url = None
+            for stream in stream_urls:
+                url = stream.get("url", "").strip()
+                if url and ".m3u8" in url:
+                    first_url = url
+                    break
+            
+            if first_url:
+                merged.setdefault(name, []).append(first_url)
+
+    # Process channels1.json (OLD format)
+    channels_url = "https://streamweb-bay.vercel.app/channels1.json"
+    log.info("Downloading JSON (old format) %s", channels_url)
+    raw = await fetch_text(session, channels_url)
+    decoded = decode_payload(raw)
+    channels: List[Dict[str, str]] = json.loads(decoded)
+    
+    for ch in channels:
+        name = ch.get("name", "").strip().lower()
+        url = ch.get("hlsUrl", "").strip()
+        if name and url:
+            merged.setdefault(name, []).append(url)
 
     # collapse to a single **alive** URL per name
     cleaned: Dict[str, str] = {}
@@ -352,4 +374,3 @@ if __name__ == "__main__":
         print(json.dumps(final, indent=2, ensure_ascii=False))
     except KeyboardInterrupt:
         log.warning("Aborted by user")
-        
