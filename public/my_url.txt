@@ -1,6 +1,0 @@
-live = https://streamweb-bay.vercel.app/live.json
-sports = https://streamweb-bay.vercel.app/sports.json
-categories = https://streamweb-bay.vercel.app/categories.json
-api = https://streamxi-score.onrender.com/
-feedback = https://forms.gle/6JuwRCWLKYrDZhwC7
-notifications = https://streamweb-bay.vercel.app/message.json

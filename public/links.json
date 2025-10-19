@@ -1,0 +1,32 @@
+{
+  "links": [
+    {
+      "title": "live",
+      "link": "https://streamweb-bay.vercel.app/live.json"
+    },
+    {
+      "title": "sports",
+      "link": "https://streamweb-bay.vercel.app/sports.json"
+    },
+    {
+      "title": "categories",
+      "link": "https://streamweb-bay.vercel.app/categories.json"
+    },
+    {
+      "title": "highlights",
+      "link": "https://streamweb-bay.vercel.app/highlights.json"
+    },
+    {
+      "title": "api",
+      "link": "https://streamxi-score.onrender.com/"
+    },
+    {
+      "title": "feedback",
+      "link": "https://forms.gle/6JuwRCWLKYrDZhwC7"
+    },
+    {
+      "title": "notifications",
+      "link": "https://streamweb-bay.vercel.app/message.json"
+    }
+  ]
+}
