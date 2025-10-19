@@ -2,7 +2,7 @@
   "redirects": [
     {
       "source": "/highlights.json",
-      "destination": "https://streamxi-highlight.onrender.com/encoded",
+      "destination": "https://lyfe05.github.io/highlight-api/matches.json",
       "permanent": true
     }
   ]
