@@ -4,11 +4,6 @@
       "source": "/highlights.json",
       "destination": "https://lyfe05.github.io/highlight-api/matches.json",
       "permanent": true
-    },
-    {
-      "source": "/score.json",
-      "destination": "https://streamxi-score.onrender.com/",
-      "permanent": true
     }
   ]
 }
