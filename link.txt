@@ -1,10 +1,14 @@
 Astro Football, = Astro Football
+CBS Sports Golazo USA = CBS Sports Golazo
 CBS Sports Network USA, CBS Sports Network (US) = CBS Sports Network
+LaLigaTV UK = La Liga TV
 LFC All Red, LFC TV = LFC TV
-Premier Sports 2 Ireland = Premier Sports 2
-Sky Sports Footbal, Sky Sports Football UK, Sky Sports Football (GB) = Sky Sports Football
+Premier Sports 1, Premier Sports 1 Ireland = Premier Sports 1
+Premier Sports 2 Ireland, Premier Sports 2 = Premier Sports 2
+Sky Sports Football, Sky Sports Football UK, Sky Sports Football (GB) = Sky Sports Football
 Sky Sports Main Event, Sky Sports Main Event UK, Sky Sports Main Event (GB) = Sky Sports Main Event
 Sky Sports+, Sky Sports+ (GB) = Sky Sports Arena
+Sportsnet World = Sportsnet World
 SuperSport Action = Supersport Action
 SuperSport Football = Supersport Football
 SuperSport Laliga = Supersport Laliga
