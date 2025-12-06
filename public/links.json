@@ -17,8 +17,8 @@
       "link": "https://streamweb-bay.vercel.app/highlights.json"
     },
     {
-      "title": "api",
-      "link": "https://streamxi-score.onrender.com/"
+      "title": "score",
+      "link": "https://streamweb-bay.vercel.app/score.json"
     },
     {
       "title": "feedback",
