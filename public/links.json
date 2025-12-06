@@ -22,11 +22,15 @@
     },
     {
       "title": "feedback",
-      "link": "https://forms.gle/6JuwRCWLKYrDZhwC7"
+      "link": "https://forms.gle/5XsfXdTvPeW8kFpp7"
     },
     {
       "title": "notifications",
       "link": "https://streamweb-bay.vercel.app/message.json"
+    },
+    {
+      "title": "website",
+      "link": "https://stream11-iota.vercel.app/"
     }
   ]
 }
