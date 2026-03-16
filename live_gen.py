@@ -291,12 +291,17 @@ async def main() -> List[Dict[str, Any]]:
         matches = parse_matches(raw_matches)
         attach_stream_urls(matches, channel_map)
 
-        plain_text = await fetch_text(
-            session,
-            "https://raw.githubusercontent.com/lyfe05/Temp/refs/heads/main/streaming.txt",
-        )
-        plain_buckets = parse_plain_streaming(plain_text)
-        await merge_plain_m3u8(session, matches, plain_buckets)
+        # Try to fetch streaming.txt, skip if 404 or any error
+        try:
+            plain_text = await fetch_text(
+                session,
+                "https://raw.githubusercontent.com/lyfe05/Temp/refs/heads/main/streaming.txt",
+            )
+            plain_buckets = parse_plain_streaming(plain_text)
+            await merge_plain_m3u8(session, matches, plain_buckets)
+        except Exception as e:
+            log.warning("Could not fetch streaming.txt (%s), skipping plain m3u8 merge", e)
+            plain_buckets = {}
 
         final = build_final_json(matches)
         log.info("Scrape finished – %d matches, %d total streams",
